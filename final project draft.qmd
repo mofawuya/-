@@ -1,0 +1,212 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+1\. You pose a clearly stated question and explain what makes it an interesting question.
+
+In the past few years, the Covid-19 has been raging around the world, especially in 2020, which was the most rapidly spreading year for the epidemic. Hence, in this project, I intend to visualize the trend of the epidemic in 2020 on a global scale and compare the differences in the development of the epidemic in different countries over time.
+
+2\. You use data appropriate for your research question. Precisely state your data source(s), the unit of analysis (geography, level of analysis, time frame, etc.).
+
+The dataset I use is collected by The Center for Systems Science and Engineering (CSSE) at JHU and is mainly a time series dataset. As stated in the previous question, I plan to visualize the trend over time, and also plot the global geographic distribution of new confirmed cases for different dates to see the changes of Covid-19 over time.
+
+3\. You articulate the main variables of interest in your project (specifically your outcome/dependent variable and one or two independent variables), justifying your choice of variables.
+
+I'm going to use all the variables in the dataset. Lat and Long variabels are used for plotting the geographic distribution of Covid-19, and the date variables are used for plotting the trend over time.
+
+4.You provide descriptive statistics for all your relevant variables. These can be a mix of graphs and summary tables.
+
+Since the variables I'm going to used do not have much statistical meaning, they are either dates or just the name of countries and the latitude and longitude. Therefore, I just use str() to provide an overview of the whole dataset.
+
+5\. You summarize the relationships of interest graphically or with statistical models, or with both. What do the data say about your research question?
+
+The line graph of the newly confirmed cases is part of the project, it just objectively reflects the trend of daily confirmed cases in both China and US.
+
+6.  The following are the codes I intend to use for the final project, this is just the draft. I'm planning on adding more features to the final project, like add a animation for the daily change.
+
+```{r}
+library(sp)
+library(maps)
+library(forcats)
+library(dplyr)
+library(ggplot2)
+library(reshape2) 
+library(ggthemes)
+library(tidyr)
+library(gganimate)
+library(tidyverse)
+library(plotly)
+```
+
+```{r}
+data<-read_csv('Conf.csv')
+data[data$`Country/Region`=='US',]$`Country/Region`='United States'
+data[data$`Country/Region`=='Korea, South',]$`Country/Region`='Korea'
+
+information_data<-data[,1:4] #Retrieve country information
+inspect_data<-data[,-c(1:4)] #Retrieve country information
+
+#convert date
+datetime<-colnames(inspect_data)
+pastetime<-function(x){
+  date<-paste0(x,'20')
+  return(date)
+}
+datetime1<-as.Date(sapply(datetime,pastetime),format='%m/%d/%Y')
+colnames(inspect_data)<-datetime1
+
+#combine data
+data<-cbind(information_data,inspect_data)
+
+#calculate new cases
+inspect_lag_data<-cbind(0,inspect_data[,1:(ncol(inspect_data)-1)])
+increase_data<-inspect_data-inspect_lag_data
+
+#combine data
+new_data<-cbind(information_data,increase_data)
+```
+
+```{r}
+##Calculate New cases for China
+china<-new_data[new_data$`Country/Region`=='China',]
+china_increase<-data.frame(apply(china[,-c(1:4)],2,sum))
+colnames(china_increase)<-'increase_patient'
+china_increase$date<-as.Date(rownames(china_increase),format="%Y-%m-%d")
+
+china_plot <- ggplot(china_increase,aes(x=date,y=increase_patient,color='New Confirmed Cases'))+geom_line(size=1)+
+  scale_x_date(date_breaks = "3 days")+ 
+  labs(x='Data',y='Number of new cases',title='Trend of new confirmed cases in China from January 22, 2020 to March 23, 2020')+
+  theme_economist()+
+  theme(plot.title = element_text(face="plain",size=15,hjust=0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size=15),
+        axis.text.x = element_text(angle = 90,size=15),
+        axis.text.y = element_text(size=15),
+        legend.title=element_blank(),
+        legend.text=element_text(size=15))
+china_plot
+```
+
+```{r}
+us<-new_data[new_data$`Country/Region`=='United States',]
+us_increase<-gather(us,key="date",value="increase_patient",'2020-01-22':'2020-03-23')
+us_increase$date<-as.Date(us_increase$date)
+ggplot(us_increase,aes(x=date,y=increase_patient,color='新增确诊人数'))+geom_line(size=1)+
+  scale_x_date(date_breaks = "3 days")+
+  labs(x='Data',y='Number of new cases',title='Trend of new confirmed cases in US from January 22, 2020 to March 23, 2020')+
+  theme_economist()+ 
+  theme(plot.title = element_text(face="plain",size=15,hjust=0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size=15),
+        axis.text.x = element_text(angle = 90,size=15),
+        axis.text.y = element_text(size=15),
+        legend.title=element_blank(),
+        legend.text=element_text(size=15))
+
+
+```
+
+```{r}
+total_increase<-data.frame(apply(new_data[,-c(1:4)],2,sum))
+colnames(total_increase)<-'increase_patient'
+total_increase$date<-as.Date(rownames(total_increase),format="%Y-%m-%d")
+ggplot(total_increase,aes(x=date,y=increase_patient,color='New confirmed Cased'))+geom_line(size=1)+
+  scale_x_date(date_breaks = "3 days")+
+  labs(x='Date',y='Number of new cases',title='Trend of new confirmed cases Globally from January 22, 2020 to March 23, 2020')+
+  theme_economist()+
+  theme(plot.title = element_text(face="plain",size=15,hjust=0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size=15),
+        axis.text.x = element_text(angle = 90,size=15),
+        axis.text.y = element_text(size=15),
+        legend.title=element_blank(),
+        legend.text=element_text(size=15))
+
+```
+
+```{r}
+mapworld<-borders("world",colour = "gray50",fill="white") 
+ggplot()+mapworld+ylim(-60,90)+
+  geom_point(aes(x=new_data$Long,y=new_data$Lat,size=new_data$`2020-01-22`),color="darkorange")+
+  scale_size(range=c(2,9))+labs(title="Global distribution of new confirmed cases on January 22, 2020")+
+  theme_grey(base_size = 15)+
+  theme(plot.title=element_text(face="plain",size=15,hjust=0.5),
+        legend.title=element_blank())
+
+ggplot()+mapworld+ylim(-60,90)+
+  geom_point(aes(x=new_data$Long,y=new_data$Lat,size=new_data$`2020-03-07`),color="darkorange")+
+  scale_size(range=c(2,9))+labs(title="Global distribution of new confirmed caes on March 7, 2020")+
+  theme_grey(base_size = 15)+
+  theme(plot.title=element_text(face="plain",size=15,hjust=0.5),
+        legend.title=element_blank())
+
+
+```
+
+```{r}
+cum_patient<-data[c("Country/Region","2020-03-23")]
+cum_patient<-cum_patient[order(cum_patient$`2020-03-23`,decreasing = TRUE),][1:10,]
+colnames(cum_patient)<-c("country","count")
+cum_patient<-mutate(cum_patient,country = fct_reorder(country, count))
+cum_patient$labels<-paste0(as.character(round(cum_patient$count/10^3,0)),"K")
+
+ggplot(cum_patient,aes(x=country,y=count))+
+geom_bar(stat = "identity", width = 0.75,fill="#f68060")+
+  coord_flip()+  #横向
+  xlab("")+
+  geom_text(aes(label = labels, vjust = 0.5, hjust = -0.15))+
+  labs(title='至2020年12月7日累计确诊病例前十的国家')+
+  theme(plot.title = element_text(face="plain",size=15,hjust=0.5))+
+  scale_y_continuous(limits=c(0, 1.8*10^5))
+
+```
+
+```{r}
+cum_patient_time<-gather(data,key="date",value="increase_patient",'2020-01-22':'2020-03-23')
+colnames(cum_patient_time)<-c("Province","Country","Lat","Long","date","increase_patient")
+five_country<-subset(cum_patient_time,Country %in% c("China","Italy","Spain","Germany","Iran"))
+five_country$date<-as.Date(five_country$date)
+```
+
+```{r}
+ggplot(five_country, 
+            aes(x=reorder(Country,increase_patient),y=increase_patient, fill=Country,frame=date)) +
+  geom_bar(stat= 'identity', position = 'dodge',show.legend = FALSE) +
+  scale_fill_brewer(palette='Set3')+
+  theme_minimal() +
+  labs(title = paste('日期:', '{current_frame}'),x = '', y ='五国累计确诊病例增长') +
+  ease_aes('linear')
+```
+
+```{r}
+animated_plot <- ggplot(five_country, 
+            aes(x=reorder(Country,increase_patient),y=increase_patient, fill=Country,frame=date)) +  
+  geom_bar(stat= 'identity', position = 'dodge',show.legend = FALSE) +  
+  geom_text(aes(label=paste0(increase_patient)),col="black",hjust=-0.2)+  
+  scale_fill_brewer(palette='Set3')+
+  theme(legend.position="none",
+        panel.background=element_rect(fill='transparent'),
+        axis.text.y=element_text(angle=0,colour="black",size=12,hjust=1),
+        panel.grid =element_blank(),
+        axis.text = element_blank(), 
+        axis.ticks = element_blank(),
+  )+
+  coord_flip()+  
+  transition_manual(frames=date) +
+  labs(title = paste('日期:', '{current_frame}'),x = '', y ='五国累计确诊病例增长')+  
+  theme(axis.title.x = element_text(size=15))+
+  ease_aes('linear')  
+
+if (FALSE) {
+# Renderers are specified in the `animate()` function
+animate(animated_plot, renderer =gifski_renderer())
+}
+
+animated_plot
+```
+
+```{r}
+
+```
